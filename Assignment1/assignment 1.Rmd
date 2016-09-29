@@ -1,0 +1,397 @@
+---
+title: "Assignment 1"
+author: "Sahil Shah (netid :sbs554, N12706992)"
+date: "September 27, 2016"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+Readme and all the datasets are located in the root directory.
+```{r setup, include=FALSE}
+library(knitr)
+setwd("/home/sahil/Documents/FDS/Assignment1/")
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, root.dir = '/home/sahil/Documents/FDS/Assignment1/')
+#opts_knit$set(root.dir='home/sahil/Documents/FDS/Assignment1')
+rawdata <- read.csv("data.txt", head = TRUE, sep = ",")
+
+```
+
+
+# Q1. Data Exploration, Qualitative statistics and Missing Data
+##1-a) Qualitatively describe the difference(s) between states in Region 1 and Region 10. Using descriptive statistics and a figure if necessary.
+
+Ans:
+```{r}
+#load region1 and region 10 data into a dataframe
+region1and10 <- data.frame(rawdata$Date, rawdata$HHS.Region.1..CT..ME..MA..NH..RI..VT., 
+                           rawdata$HHS.Region.10..AK..ID..OR..WA.)
+colnames(region1and10) <- c("date", "region1", "region10")
+#convert the data to numeric
+region1and10$region1 <- as.numeric(as.character(region1and10$region1))
+region1and10$region10 <- as.numeric(as.character(region1and10$region10))
+region1and10$date <-as.Date(as.character(rawdata$Date)) #convert to date format
+#this is to treat the region1 and region10 as variables to plot there boxplot and compare 
+
+
+
+```
+
+
+```{r cars}
+summary(region1and10)
+library(reshape2)
+meltData <- melt(region1and10, id = c("date")) 
+meltData$value <- as.numeric(as.character(meltData$value))
+```
+As you can see from the summary we see that region1 has higher minimum and maximum but lower mean and median on the other hand region 10 has higher mean and median than region 1. This is showcased by the following boxplot.
+```{r pressure, echo=FALSE}
+boxplot(meltData$value ~ meltData$variable, data = meltData)
+```
+
+Another interesting thing to observe will be when does this maxima occur with respect to the date and this can be verified by looking  at the timeseries of both the regions and we find out that both the maxima occur pretty close to each other. 
+Also the scatterplot and timeseries both confirm why mean is higher for region 10 despite maxima and minima being lower as the region 10 flu values are generally higher than region 1.
+```{r echo=FALSE}
+library(ggplot2)
+plot(region1and10$region1, region1and10$region10, xlab = "Region 1", ylab = "Region 10", 
+     main = "Region 10 vs Region 1 Flu Levels")
+ggplot() + 
+  geom_line( data = region1and10, aes(x = region1and10$date, y = region1and10$region1, color = "region1")) +
+  geom_line(data = region1and10, aes(x = region1and10$date, y = region1and10$region10, color = "region10"))  +
+  xlab('date') +
+  ylab('flulevel')
+```
+
+##1-b) Compare query data from all cities in Arizona over all years using multiple descriptors. What metrics do you use? Reason your approach for dealing with missing data.
+
+```{r}
+Arizonacities <- data.frame(rawdata$Date, rawdata$Mesa..AZ, rawdata$Phoenix..AZ, 
+                            rawdata$Scottsdale..AZ, rawdata$Tempe..AZ, rawdata$Tucson..AZ)
+colnames(Arizonacities) <- c("Date", "Mesa..AZ", "Phoenix..AZ", "Scottsdale..AZ", 
+                             "Tempe..AZ" , "Tucson..AZ")
+Arizonacities$Mesa..AZ <- as.numeric(as.character(Arizonacities$Mesa..AZ))
+Arizonacities$Phoenix..AZ <- as.numeric(as.character(Arizonacities$Phoenix..AZ))
+Arizonacities$Tempe..AZ <- as.numeric(as.character(Arizonacities$Tempe..AZ))
+Arizonacities$Tucson..AZ<- as.numeric(as.character(Arizonacities$Tucson..AZ))
+Arizonacities$Scottsdale..AZ <- as.numeric(as.character(Arizonacities$Scottsdale..AZ))
+Arizonacities$Date = as.Date(as.character(Arizonacities$Date)) 
+
+```
+Let us briefly look at the summary data of Arizona cities. This will help us get an idea on various metrics like mean, max, median etc.
+```{r}
+summary(Arizonacities)
+cor(na.omit(Arizonacities[,-1]))
+```
+We find out that all this cities are highly comparable. Also we are also able to surmise that although Phoenix has the highest flu level it is lower on every count. 
+
+###1st Metric : Mean
+There are numerous ways to go about this. The basic is ofcourse to look at the means of all cities and compare which leads us to believe mean of each site lies in 2000-2500 range. We can also do monthly average of flu of every city. 
+```{r}
+library(lubridate)
+month <- paste(month(Arizonacities$Date))
+monthdf<- data.frame(aggregate(Arizonacities, list(month),mean, na.rm = T))
+colnames(monthdf)[1]<- "month"
+meltDatamonth <- melt(monthdf , id = c("Date", "month"))
+year <- paste(year(Arizonacities$Date))
+yeardf <- data.frame(aggregate(Arizonacities, list(year),mean, na.rm = T))
+colnames(yeardf)[1]<- "year"
+meltyear <- melt(yeardf, id = c("Date" , "year"))
+```
+The next graph shows the monthly and yearly average of Arizona cities for comparison.  We are able to see the similarity within the cities. Also we are able to identify that colder months affect the cities equally (like Dec, Jan and Feb).  
+
+```{r echo= FALSE}
+ggplot(meltDatamonth, aes(factor(meltDatamonth$month), meltDatamonth$value, 
+                          fill = meltDatamonth$variable)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_brewer(palette = "Set1") + 
+  ggtitle('Average Flu level vs month')
+ggplot(meltyear, aes(factor(meltyear$year), meltyear$value, fill = meltyear$variable)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_brewer(palette = "Set1") + 
+  ggtitle('Average Flu level vs Year')
+
+```
+
+### 2nd Metric: Median, Max and Quartiles 
+In order to see the effect of medians, max and quartiles, we can visually depict them on a box plot and compare their maximas and medians.  
+```{r}
+meltAz <- melt(Arizonacities , id = c("Date"))
+boxplot(meltAz$value ~ meltAz$variable, data = meltAz)
+```  
+
+Next we compare each city with their max flu level for every month and every year. This will help us with identifying the coldest month and compare cities with eachother on the basis of severity.  
+```{r}
+library(lubridate)
+month <- paste(month(Arizonacities$Date))
+monthdf<- data.frame(aggregate(Arizonacities, list(month),max, na.rm = T))
+colnames(monthdf)[1]<- "month"
+meltDatamonth <- melt(monthdf , id = c("Date", "month"))
+year <- paste(year(Arizonacities$Date))
+yeardf <- data.frame(aggregate(Arizonacities, list(year),max, na.rm = T))
+colnames(yeardf)[1]<- "year"
+meltyear <- melt(yeardf, id = c("Date" , "year"))
+ggplot(meltDatamonth, aes(factor(meltDatamonth$month), meltDatamonth$value, 
+                          fill = meltDatamonth$variable)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_brewer(palette = "Set1") + 
+  ggtitle('Maximum Flu Level vs month')
+ggplot(meltyear, aes(factor(meltyear$year), meltyear$value, fill = meltyear$variable)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_brewer(palette = "Set1") + 
+  ggtitle('Maximum Flu Level vs Year')
+```
+
+###Missing Values:
+The missing values have simply been neglected. This was done by using _na.rm_ option and setting it to _True_. The reasons to do are as follows:  
+1. The way to include them would have involved assuming it on the basis of previous weeks. But several months(almost 2 years) data is missing. So approximation wouldn't have done it justice. Also it just so happens 2003 year data is missing and if you look at 2003 it is a record year in terms of average flu level and thus any approximation would probably have been inaccurate.  
+2. The other reason, albeit an obvious one, is that the duration of dataset is high enough that we can afford the luxury to neglect few cells.
+
+##1-c) Find the population of the states (give a complete citation/credit for your source), and create a comparison of population vs. peak flu trend value for the most recent year. Is the relationship significant? Does it depend on if you consider the data as continuous or categorical (You will have to decide how to bin the data)?
+
+**Source of population Data**: https://www.census.gov/popest/data/national/totals/2015/files/NST-EST2015-alldata.csv
+
+The following steps are listed to plot the Population v Peak Flu graph  
+```{r}
+#only get 2015 data into the dataframe
+GFTdata <- read.csv("data.txt", head = TRUE, sep = ",", skip=588) 
+#this step extracts the first row i.e the names of the columns
+header <- read.csv("data.txt", nrows = 1, header = FALSE, sep =',', 
+                   stringsAsFactors = FALSE) 
+colnames(GFTdata) <- unlist(header) #this step attaches those names to GFTdata dataframe
+GFTdata <- GFTdata[3:53] #only get the 50 states and ignore the rest columns
+colMax <- function(data) sapply(data, max, na.rm = TRUE) #find the maximum of the columns
+Peakflu <- data.frame(colMax(GFTdata)) #apply the maximum function to the GFTdata dataframe
+colnames(Peakflu)[1] <- "PeakLevel" 
+Peakflu[,2] <- colnames(GFTdata)
+colnames(Peakflu)[2] <- "names"
+Populationdata<-read.csv("NST-EST2015-alldata.csv",head=TRUE,sep=",")
+#this steps get the requisite fields into a new dataframe namely state name and the population
+Populationstates<- data.frame(Populationdata[,5], Populationdata[,13]) 
+colnames(Populationstates)[1] <- "name"
+colnames(Populationstates)[2] <- "population2015"
+#this is a step to merge two dataframe on a common field. this is essentially an inner join.[1]
+mergeState<-data.frame(merge(Peakflu ,Populationstates, by.x=c("names"),by.y=c("name"))) 
+```
+  
+###Continuous Data
+  
+```{r}
+kable(mergeState, format = "markdown")
+plot(mergeState$population2015,mergeState$PeakLevel,ylab="Peak Values", xlab="Population", 
+     main="Peak Flu v. Population")
+cor(mergeState[,-1])
+
+```
+As we can see from the graph, treating the data as continuous, there is **no direct relation** between Population and Peak Flu. This is further verified by finding out the correlation coefficient which comes out to be very low (-0.0420)
+
+###Categorical Data  
+In order to treat the data as categorical we will need to perform binning on the data. 
+Now let us perform Equal Frequency Binning on Flu data. We bin the data into 10 categories of equal frequency and then smooth individual categories with respect to mean.
+
+```{r}
+require(ggplot2)
+mergedstate1 <- mergeState
+mergedstate1[,"FluBin"] <-(cut_number(mergedstate1$PeakLevel, n = 10)) #this creates the bins 
+#this performs smoothing based on means
+df0 <- data.frame(aggregate(mergedstate1$PeakLevel, list(mergedstate1$FluBin),mean, na.rm = T)) 
+mergedstate1$FluBin<- as.character(mergedstate1$FluBin)
+df0$Group.1 <- as.character(df0$Group.1)
+require(plyr)
+mergedstate1$FluBin <- mapvalues(mergedstate1$FluBin, from=df0$Group.1, to=df0$x) 
+plot(mergedstate1$population2015, mergedstate1$FluBin, 
+     ylab = "Equal Frequency Mean Smoothed Flu Data", xlab = "Population", 
+     main = " Categorical Peak Flu v. Continuous  Population" )
+mergedstate1$FluBin<-as.numeric(mergedstate1$FluBin)
+cor((mergedstate1[,-1]))
+```
+  
+We see that there is no relation ship between Population and Peak flu even if the fludata is categorical which is further proved with correlation coefficient of -0.05099 between population2015 and Bin. 
+
+Lets see what happens if we also consider the Population to be categorical. 
+  
+```{r}
+require(ggplot2)
+#mergedstate1 <- mergeState
+mergedstate1[,"PopBin"] <-(cut_number(mergedstate1$population2015, n = 10))
+df2 <- data.frame(aggregate(mergedstate1$population2015, list(mergedstate1$PopBin),mean, na.rm = T))
+mergedstate1$PopBin<- as.character(mergedstate1$PopBin)
+df2$Group.1 <- as.character(df2$Group.1)
+require(plyr)
+mergedstate1$PopBin <- mapvalues(mergedstate1$PopBin, from=df2$Group.1, to=df2$x)
+mergedstate1$PopBin <- as.numeric(mergedstate1$PopBin)
+kable(mergedstate1, format = "markdown")
+plot( mergedstate1$PopBin, mergedstate1$PeakLevel, ylab = "Peak Flu", 
+     xlab = "Equal Frequency Mean Smoothed Population Data", 
+     main = "Continuous Peak Flu vs Categorical  Population")
+plot(mergedstate1$PopBin, mergedstate1$FluBin, ylab = "Equal Frequency Mean Smoothed Flu Data", 
+     xlab = "Equal Frequency Mean Smoothed Population Data", 
+     main = "Categorical Peak Flu vs Categorical  Population")
+```
+  
+First we need to understand treating the data as continuous is always a far better idea as it preserves the nuance of the dataset. Also in this case it doesn't matter if it is categorical or continuous as there is intuitively no relation between Population and peak flu level. 
+Nevertheless, it **does not** depend if we consider the data to be categorical
+Still there is no relation between Population and Peak Flu even if consider either or both categorical. This is reinforced by the correlation matrix of Final Dataframe which shows very low correlation coefficient. (Note: the high correlation coefficient are between binned data and their corresponding continuous data which is expected)
+```{r}
+cor(mergedstate1[,-1])
+```
+
+##1-d)For this question, download the flu data for all of the countries. Plot the center latitude for the country versus peak week of flu in the most recent year of data. Is there any relationship? In your response remember to credit your source for the latitude information.
+
+Simple google search for latitude information of each country leads us to this result as the **source**: https://developers.google.com/public-data/docs/canonical/countries_csv
+
+The problem is, however, that the table is embedded within the webpage. We will need to do some webscraping for this. [2]
+```{r}
+library("XML")
+library("RCurl")
+URL<-getURL("https://developers.google.com/public-data/docs/canonical/countries_csv")
+htmltable <-data.frame(readHTMLTable(URL,header = TRUE,as.data.frame = TRUE,which=1))
+countrylatitude <- htmltable[,c("latitude","name")]
+#load world data from GFT and skip directly to the latest year i.e. 2015
+worlddata <- read.csv("worlddata.txt", head=TRUE, sep = ",", skip=627)
+header <- read.csv("worlddata.txt", nrows = 1, header = FALSE, sep =',', stringsAsFactors = FALSE)
+colnames(worlddata) <- unlist(header)
+colMax <- function(data) sapply(data, max, na.rm = TRUE)
+Peakworld <- data.frame(colMax(worlddata[,2:30]))#apply maximum function on all columns except Date
+colnames(Peakworld)[1] <- "Peaklevel" 
+Peakworld[,2] <- rownames(Peakworld) 
+colnames(Peakworld)[2] <- "names"
+mergedcountries<-data.frame(merge(Peakworld , countrylatitude, by.x=c("names"),by.y=c("name"))) #[1]
+kable(mergedcountries, format = "markdown")
+mergedcountries$latitude = as.numeric(as.character(mergedcountries$latitude))                            
+
+```
+
+###Peak Flu vs Latitude
+
+```{r}
+plot(mergedcountries$latitude, mergedcountries$Peaklevel,ylab="Peak Values", 
+     xlab="latitudes", main="Peak values vs Latitude")
+cor(mergedcountries[,-1])
+```
+Just looking at the graphs I think there is no relation between latitude and peak week values. As the values are pretty much scattered. For instance between latitudes -40 to -20 we find the values range from 0 to 5000.  
+This intuition is confirmed by the correlation function which gives a pretty low coefficient of 0.247 and hence this confirms that there is little to no relation between latitudes and flu levels.
+
+###Peak Date of Flu vs Latitude
+
+Alternatively,
+Lets see when these Peaks occur within a year and see if there is some relation between timing of the peaks and latitudes. 
+```{r}
+Peakweek1 <- data.frame(as.Date(worlddata$Date[apply(worlddata[,2:30],2,which.max)]))
+colnames(Peakweek1)[1] <- 'Date'
+Peakweek1[,"names"] = colnames(worlddata)[2:30]
+mergedcountries1<-data.frame(merge(Peakweek1 , countrylatitude, by.x=c("names"),by.y=c("name"))) #[1]
+mergedcountries1$latitude = as.numeric(as.character(mergedcountries1$latitude)) 
+kable(mergedcountries1, format = "markdown")
+plot(mergedcountries1$latitude,mergedcountries1$Date,ylab="Peak Flu Dates", 
+     xlab="latitudes", main="Weeks when Flu was maximum vs Latitude")
+```
+  
+This is really interesting. We observe that for latitudes 20 to 60, Jan - March is the time of the year when peaks occur whereas for latitudes -40 to 0, May to December is the time when flu level is highest. Thus **there is indeed some relation** between Latitudes and Week of the year when peaks are observed. 
+
+#Q2. Noise: Average the United States data to a monthly or lower frequency. How do the time series compare as you go to two lower frequencies (what metrics do you use to compare)?
+
+First lets see the current time series with the weekly frequency. I am going to plot the United States column within the United states data frame(rawdata here)
+```{r}
+library(ggplot2)
+rawdata$Date <-as.Date(as.character(rawdata$Date))
+ggplot(rawdata, aes(rawdata$Date, rawdata$United.States)) + 
+  geom_line() + scale_x_date(date_labels = "%b %Y") + xlab("Weekly") + ylab("Flu level") +
+  ggtitle("Weekly Time Series")
+```
+This tells us although we are able to identify the peaks and low we still have a lot of noise we the value fluctuating between each maxima and minima. 
+Next let us reduce the frequency to monthly. And see where it leads us in terms of time series. 
+```{r}
+monthly <- paste(paste(year(rawdata$Date),month(rawdata$Date), sep = "-")) 
+```
+Now lets look at the metrics we can use to analyse. I see two metrics of use: **mean** and **max**. Mean will work when we need to get the general idea of the data of the country and will be more accurate representation of flu level as time progresses.
+```{r}
+monthlydata <- data.frame(aggregate(rawdata, list(monthly),mean, na.rm = T))
+```
+The 2nd metric of interest is maximum: This is helpful as it helps us predict the severity of the flu. We can find out how severe can flu get and we can prepare for the worst in the future.
+```{r}
+monthlymaxdata <- data.frame(aggregate(rawdata, list(monthly),FUN = max, na.rm = T))
+```
+Let us see both graphs and see how has the noise been affected with the weekly data...
+```{r}
+ggplot(monthlydata, aes(monthlydata$Date, monthlydata$United.States)) +
+  geom_line() + scale_x_date(date_labels = "%b %Y") + xlab("Monthly") + ylab(" Mean Flu level") + 
+  ggtitle("Monthly Mean Time Series")
+ggplot(monthlymaxdata, aes(monthlymaxdata$Date, monthlymaxdata$United.States)) + 
+  geom_line() + scale_x_date(date_labels = "%b %Y") + xlab("Monthly") + ylab("Maximum Flu level") + 
+  ggtitle("Monthly Max Time Series")
+```
+Let us further reduce the frequency to quarterly and repeat the above process again
+```{r}
+quarterly <- paste(paste(year(rawdata$Date),quarter(rawdata$Date), sep = "-"))
+quarterlydata <- data.frame(aggregate(rawdata, list(quarterly),mean, na.rm = T))
+quarterlymaxdata <- data.frame(aggregate(rawdata, list(quarterly),FUN = max, na.rm = T))
+ggplot(quarterlydata, aes(quarterlydata$Date, quarterlydata$United.States)) +
+  geom_line() + scale_x_date(date_labels = "%Y") + xlab("Quarterly") + ylab("Mean Flu level")+
+  ggtitle("Quarterly Mean Time Series")
+ggplot(quarterlymaxdata, aes(quarterlymaxdata$Date, quarterlymaxdata$United.States)) + 
+  geom_line() + scale_x_date(date_labels = "%Y") + xlab("Quarterly") + ylab("Max Flu level") +
+  ggtitle("Quarterly Max Time Series")
+```
+We clearly see the noise disappearing and the edges smoothening however with loss of accuracy.
+Now lets go to one step further and move to yearly...
+```{r}
+yearly <- paste(year(rawdata$Date))
+yearlydata <- data.frame(aggregate(rawdata, list(yearly),mean, na.rm = T))
+yearlymaxdata  <- data.frame(aggregate(rawdata, list(yearly),FUN = max, na.rm = T))
+ggplot(yearlydata, aes(yearlydata$Date, yearlydata$United.States)) + 
+  geom_line() + scale_x_date(date_labels = "%Y") + xlab("Yearly") + ylab("Mean Flu level") +
+  ggtitle("Yearly Mean time series")
+ggplot(yearlymaxdata, aes(yearlymaxdata$Date, yearlymaxdata$United.States)) + 
+  geom_line() + scale_x_date(date_labels = "%Y") + xlab("Yearly") + ylab("Max Flu level") + 
+  ggtitle("Yearly Max Time Series")
+```
+Here we see completely different nature of the graph and a lot of actual relevant information is lost. However this does help us to visualize how flu level has progressed yearly and let us get idea which year was the worst in terms of Flu.  
+**Conclusion**  
+As we reduce frequency the fluctuations between maximas and minimas disappear and the graphs smoothens. In other words the noise disappears. However as frequency gets too low (yearly) the entire shape of the graph changes.  
+
+#Q3. Web Scraping
+##3-1) Read the Vaccine Status data from the table on the above website into an R data frame. There are many packages to use, I suggest you try the XML package which has useful functions such as htmlParse() to read in HTML documents and readHTML_Table().
+
+```{r}
+newurl <- "http://www.cdc.gov/mmwr/preview/mmwrhtml/mm6401a4.htm?s_cid=mm6401a4_w"
+newurltable <- readHTMLTable(newurl, header=T, which=1,stringsAsFactors=F)
+newurltable <- newurltable[1:40,]  #remove extraneous rows
+```
+If we look at the table in the url: we see we are only interested in Vaccination Status. This will take some parsing but we have already loaded the table now we can use internal R functions to get the desired dataframe.
+```{r}
+vaccine_status <- data.frame(newurltable$V1)
+vaccine_status[,2] <-data.frame(newurltable$V7)
+vaccine_status[,3]<-data.frame(newurltable$V8)
+vaccine_status[,4]<-data.frame(newurltable$V9)
+vaccine_status[,5]<-data.frame(newurltable$V10)
+colnames(vaccine_status)<- c("Characteristics", "No.", "Total", "%", "p value")
+vaccine_status <- vaccine_status[-(1:3),]
+kable(vaccine_status, format = "markdown")
+```
+
+##3-2) Find another example of a table somewhere on the web to load into R (Reminder, everyone must complete this assignment independently including finding a unique table to download). Provide the link to where the table is found along with your code.
+
+```{r}
+newurl <- getURL("https://en.wikipedia.org/wiki/List_of_highest-grossing_films")
+newurltable <- data.frame(readHTMLTable(newurl, header=T, which=1,stringsAsFactors=F))
+newurltable <- newurltable[,-6]
+kable(newurltable, format = "markdown")
+```
+
+#Q4. Go Viral Study
+I have already signed up for the study and will be reporting symptoms in the coming weeks.
+
+\newpage
+
+#References
+  
+Parts of homeworks where briefly discussed with Vivek Ghatala. Only approach was discussed, the implementation was on my own.  
+
+1. http://stackoverflow.com/questions/1299871/how-to-join-merge-data-frames-inner-outer-left-right
+2. http://stackoverflow.com/questions/1395528/scraping-html-tables-into-r-data-frames-using-the-xml-package
+3. https://www.r-bloggers.com/from-continuous-to-categorical/
+4. http://stackoverflow.com/questions/17721126/simplest-way-to-do-grouped-barplot
+5. https://www.r-bloggers.com/scraping-table-from-any-web-page-with-r-or-cloudstat/
+6. http://www.columbia.edu/~cjd11/charles_dimaggio/DIRE/styled-4/styled-6/code-13/
+7. http://stackoverflow.com/questions/11722568/roughly-equal-binning-of-frequencies
+8. http://stackoverflow.com/questions/22579390/get-values-in-one-column-that-correspond-with-max-value-of-other-columns-in-a-ma
